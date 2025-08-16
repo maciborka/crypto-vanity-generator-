@@ -20,7 +20,13 @@ from pathlib import Path
 from datetime import datetime
 
 # Импорт оптимизированных сетевых классов
-from networks.optimized import OptimizedTronNetwork, OptimizedBitcoinNetwork, OptimizedEthereumNetwork
+from networks.optimized import (
+    OptimizedTronNetwork, OptimizedBitcoinNetwork, OptimizedEthereumNetwork,
+    OptimizedBSCNetwork, OptimizedPolygonNetwork, OptimizedArbitrumNetwork, OptimizedOptimismNetwork
+)
+
+# Импорт общих функций
+from core.pattern_matcher import check_address_pattern, estimate_pattern_difficulty, get_currency_alphabet_info
 
 @dataclass
 class BatchTask:
@@ -54,7 +60,11 @@ class BatchVanityGenerator:
             'LTC': OptimizedBitcoinNetwork(),  # Litecoin использует ту же схему
             'DOGE': OptimizedBitcoinNetwork(), # Dogecoin тоже
             'ETH': OptimizedEthereumNetwork(),
-            'TRX': OptimizedTronNetwork()
+            'TRX': OptimizedTronNetwork(),
+            'BSC': OptimizedBSCNetwork(),
+            'MATIC': OptimizedPolygonNetwork(),
+            'ARB': OptimizedArbitrumNetwork(),
+            'OP': OptimizedOptimismNetwork()
         }
         
         self.running = True
@@ -129,40 +139,21 @@ class BatchVanityGenerator:
         return tasks
 
     def estimate_task_difficulty(self, task: BatchTask) -> Tuple[str, str, float]:
-        """Оценка сложности задачи"""
-        pattern_len = len(task.pattern)
+        """Оценка сложности задачи используя общую функцию"""
+        level, probability, time_seconds = estimate_pattern_difficulty(
+            task.pattern, task.pattern_type, task.currency
+        )
         
-        # Базовая вероятность для каждой валюты
-        if task.currency in ['BTC', 'LTC', 'DOGE']:
-            base_chars = 58  # Base58
-        elif task.currency == 'ETH':
-            base_chars = 16  # Hex
-        elif task.currency == 'TRX':
-            base_chars = 58  # Base58
-        else:
-            base_chars = 58
-        
-        # Учитываем ignore_case
-        if task.ignore_case and task.currency in ['ETH']:
-            pattern_len = pattern_len * 0.8  # Приблизительное уменьшение сложности
-        
-        probability = base_chars ** pattern_len
-        estimated_speed = 100000  # адресов/сек для всех ядер
-        time_seconds = probability / estimated_speed
-        
+        # Форматируем время для отображения
         if time_seconds < 60:
-            level = "Быстро"
             time_str = f"~{time_seconds:.1f} сек"
         elif time_seconds < 3600:
-            level = "Средне"
             time_str = f"~{time_seconds/60:.1f} мин"
         elif time_seconds < 86400:
-            level = "Долго"
             time_str = f"~{time_seconds/3600:.1f} ч"
         else:
-            level = "Экстремально"
             time_str = f"~{time_seconds/86400:.1f} дн"
-        
+            
         return level, time_str, time_seconds
 
     def execute_single_task(self, task: BatchTask, workers: int = None) -> BatchResult:
@@ -408,21 +399,14 @@ class BatchVanityGenerator:
                 attempts += 1
                 local_batch_count += 1
                 
-                # Проверка паттерна
-                address = key.address
-                if ignore_case:
-                    address = address.lower()
-                    check_pattern = pattern.lower()
-                else:
-                    check_pattern = pattern
-                
-                match = False
-                if pattern_type == "prefix":
-                    match = address.startswith(check_pattern)
-                elif pattern_type == "suffix":
-                    match = address.endswith(check_pattern)
-                
-                if match:
+                # Проверка паттерна используя общую функцию
+                if check_address_pattern(
+                    address=key.address,
+                    currency=key.currency,
+                    pattern=pattern,
+                    pattern_type=pattern_type,
+                    ignore_case=ignore_case
+                ):
                     found.append({
                         'address': key.address,
                         'private_key': key.private_key,
@@ -459,21 +443,14 @@ class BatchVanityGenerator:
                 key = network.generate()
                 attempts += 1
                 
-                # Проверка паттерна
-                address = key.address
-                if ignore_case:
-                    address = address.lower()
-                    check_pattern = pattern.lower()
-                else:
-                    check_pattern = pattern
-                
-                match = False
-                if pattern_type == "prefix":
-                    match = address.startswith(check_pattern)
-                elif pattern_type == "suffix":
-                    match = address.endswith(check_pattern)
-                
-                if match:
+                # Проверка паттерна используя общую функцию
+                if check_address_pattern(
+                    address=key.address,
+                    currency=key.currency,
+                    pattern=pattern,
+                    pattern_type=pattern_type,
+                    ignore_case=ignore_case
+                ):
                     found.append({
                         'address': key.address,
                         'private_key': key.private_key,
@@ -594,8 +571,8 @@ def main():
                       help='Выполнить одну задачу из конфига')
     
     # Параметры для одиночного поиска (совместимость)
-    parser.add_argument('--currency', choices=['BTC', 'ETH', 'TRX', 'LTC', 'DOGE'],
-                      help='Криптовалюта')
+    parser.add_argument('--currency', choices=['BTC', 'ETH', 'TRX', 'LTC', 'DOGE', 'BSC', 'MATIC', 'ARB', 'OP'],
+                      help='Криптовалюта (BTC, ETH, TRX, LTC, DOGE, BSC, MATIC, ARB, OP)')
     parser.add_argument('--prefix', help='Префикс для поиска')
     parser.add_argument('--suffix', help='Суффикс для поиска')
     parser.add_argument('--count', type=int, default=0, help='Количество адресов')

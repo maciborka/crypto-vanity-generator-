@@ -28,7 +28,13 @@ from pathlib import Path
 from datetime import datetime
 
 # Импорт сетевых модулей
-from networks.optimized import OptimizedTronNetwork, OptimizedBitcoinNetwork, OptimizedEthereumNetwork
+from networks.optimized import (
+    OptimizedTronNetwork, OptimizedBitcoinNetwork, OptimizedEthereumNetwork,
+    OptimizedBSCNetwork, OptimizedPolygonNetwork, OptimizedArbitrumNetwork, OptimizedOptimismNetwork
+)
+
+# Импорт общих функций
+from core.pattern_matcher import check_address_pattern, estimate_pattern_difficulty
 
 @dataclass
 class OptimizedKey:
@@ -76,7 +82,11 @@ class HighPerformanceWorker:
             'LTC': lambda: OptimizedBitcoinNetwork('LTC'), 
             'DOGE': lambda: OptimizedBitcoinNetwork('DOGE'),
             'ETH': OptimizedEthereumNetwork,
-            'TRX': OptimizedTronNetwork
+            'TRX': OptimizedTronNetwork,
+            'BSC': OptimizedBSCNetwork,
+            'MATIC': OptimizedPolygonNetwork,
+            'ARB': OptimizedArbitrumNetwork,
+            'OP': OptimizedOptimismNetwork
         }
         
         network_factory = networks.get(self.currency)
@@ -87,13 +97,14 @@ class HighPerformanceWorker:
         return network
     
     def check_pattern_fast(self, address: str) -> bool:
-        """Быстрая проверка паттерна без дополнительных вызовов"""
-        check_addr = address if self.case_sensitive else address.lower()
-        
-        if self.pattern_type == "prefix":
-            return check_addr.startswith(self.search_pattern)
-        else:  # suffix
-            return check_addr.endswith(self.search_pattern)
+        """Быстрая проверка паттерна используя общую функцию"""
+        return check_address_pattern(
+            address=address,
+            currency=self.currency,
+            pattern=self.pattern,
+            pattern_type=self.pattern_type,
+            ignore_case=not self.case_sensitive
+        )
     
     def work_batch(self, batch_size: int = 1000) -> List[OptimizedKey]:
         """Обработка пакета адресов для минимизации накладных расходов"""
@@ -231,43 +242,8 @@ class MaxCoreVanityGenerator:
         return max(1, optimal)  # Минимум 1 воркер
     
     def estimate_difficulty(self, pattern: str, pattern_type: str, currency: str) -> Tuple[str, int, float]:
-        """Оценка сложности поиска"""
-        # Базовые характеристики алфавитов
-        alphabets = {
-            'BTC': 58,  # Base58
-            'LTC': 58,
-            'DOGE': 58, 
-            'ETH': 16,  # Hex
-            'TRX': 58   # Base58
-        }
-        
-        alphabet_size = alphabets.get(currency, 58)
-        pattern_length = len(pattern)
-        
-        # Примерная вероятность
-        probability = alphabet_size ** pattern_length
-        
-        # Классификация сложности
-        if probability <= 100:
-            level = "Очень легко"
-            time_estimate = probability / 200000  # секунд при 200k addr/s
-        elif probability <= 10000:
-            level = "Легко"  
-            time_estimate = probability / 150000
-        elif probability <= 1000000:
-            level = "Средне"
-            time_estimate = probability / 100000
-        elif probability <= 100000000:
-            level = "Сложно"
-            time_estimate = probability / 80000
-        elif probability <= 10000000000:
-            level = "Очень сложно"
-            time_estimate = probability / 60000
-        else:
-            level = "Экстремально"
-            time_estimate = probability / 40000
-        
-        return level, probability, time_estimate
+        """Оценка сложности поиска используя общую функцию"""
+        return estimate_pattern_difficulty(pattern, pattern_type, currency)
     
     def start_generation(self, currency: str, pattern: str, pattern_type: str, 
                         case_sensitive: bool, count: int, worker_count: Optional[int] = None):
@@ -491,8 +467,8 @@ def main():
     parser = argparse.ArgumentParser(description='Максимально оптимизированный vanity генератор')
     
     # Основные параметры
-    parser.add_argument('--currency', required=True, choices=['BTC', 'LTC', 'DOGE', 'ETH', 'TRX'],
-                        help='Тип криптовалюты')
+    parser.add_argument('--currency', required=True, choices=['BTC', 'LTC', 'DOGE', 'ETH', 'TRX', 'BSC', 'MATIC', 'ARB', 'OP'],
+                        help='Тип криптовалюты (BTC, LTC, DOGE, ETH, TRX, BSC, MATIC, ARB, OP)')
     
     group = parser.add_mutually_exclusive_group(required=True)
     group.add_argument('--prefix', help='Префикс для поиска')

@@ -326,3 +326,33 @@ class OptimizedEthereumNetwork(BaseNetwork):
             private_key=private_key_bytes.hex(),
             currency=self.currency
         )
+
+# ========== EVM СОВМЕСТИМЫЕ СЕТИ ==========
+
+class OptimizedBSCNetwork(OptimizedEthereumNetwork):
+    """Оптимизированная версия BSC (использует тот же алгоритм что ETH)"""
+    
+    def __init__(self):
+        super().__init__()
+        self.currency = "BSC"
+
+class OptimizedPolygonNetwork(OptimizedEthereumNetwork):
+    """Оптимизированная версия Polygon (использует тот же алгоритм что ETH)"""
+    
+    def __init__(self):
+        super().__init__()
+        self.currency = "MATIC"
+
+class OptimizedArbitrumNetwork(OptimizedEthereumNetwork):
+    """Оптимизированная версия Arbitrum (использует тот же алгоритм что ETH)"""
+    
+    def __init__(self):
+        super().__init__()
+        self.currency = "ARB"
+
+class OptimizedOptimismNetwork(OptimizedEthereumNetwork):
+    """Оптимизированная версия Optimism (использует тот же алгоритм что ETH)"""
+    
+    def __init__(self):
+        super().__init__()
+        self.currency = "OP"
