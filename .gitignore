@@ -130,3 +130,4 @@ wallets/
 keys/
 *_keys.txt
 *_private.txt
+deploy_to_github.sh
